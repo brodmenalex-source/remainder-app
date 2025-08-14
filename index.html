@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminder App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for better UI feedback */
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            opacity: 0;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-2xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 dark:text-white">Reminder Pro</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Set it, forget it, and get notified.</p>
+        </header>
+
+        <main>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-2xl font-semibold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">New Reminder</h2>
+                <form id="reminderForm" class="space-y-6">
+                    <div>
+                        <label for="reminderText" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reminder Message</label>
+                        <input type="text" id="reminderText" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Water the plants" required>
+                    </div>
+
+                    <div>
+                        <label for="reminderTime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Time</label>
+                        <input type="time" id="reminderTime" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Repetition</label>
+                        <div class="mt-2 space-y-2">
+                            <div class="flex items-center">
+                                <input id="repeat-none" name="repetitionType" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" value="none" checked>
+                                <label for="repeat-none" class="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">None</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="repeat-regular" name="repetitionType" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" value="regular">
+                                <label for="repeat-regular" class="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">Repeat every</label>
+                                <input type="number" id="repeatDays" min="1" value="3" class="ml-2 w-20 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-1 px-2 text-sm">
+                                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">days</span>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="repeat-incremental" name="repetitionType" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" value="incremental">
+                                <label for="repeat-incremental" class="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">Incremental (starts every</label>
+                                <input type="number" id="incrementalStartDays" min="1" value="3" class="ml-2 w-20 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-1 px-2 text-sm">
+                                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">days)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Set Reminder
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="activeReminders" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Active Reminders</h2>
+                <ul id="reminderList" class="space-y-3">
+                    <!-- Reminders will be dynamically added here -->
+                    <li id="no-reminders" class="text-center text-gray-500 dark:text-gray-400 py-4">No active reminders.</li>
+                </ul>
+            </div>
+        </main>
+        
+        <div id="toast" class="toast"></div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const reminderForm = document.getElementById('reminderForm');
+            const reminderList = document.getElementById('reminderList');
+            const noRemindersMessage = document.getElementById('no-reminders');
+            const toast = document.getElementById('toast');
+
+            let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+
+            // Function to show a toast message
+            function showToast(message) {
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            // Function to render the list of reminders
+            function renderReminders() {
+                reminderList.innerHTML = ''; // Clear existing list
+                if (reminders.length === 0) {
+                    reminderList.appendChild(noRemindersMessage);
+                    noRemindersMessage.style.display = 'block';
+                } else {
+                    noRemindersMessage.style.display = 'none';
+                    reminders.forEach(reminder => {
+                        const li = document.createElement('li');
+                        li.className = 'p-4 bg-gray-50 dark:bg-gray-700 rounded-lg flex items-center justify-between shadow-sm';
+                        
+                        let repetitionText = 'One-time';
+                        if(reminder.repetition.type === 'regular') {
+                            repetitionText = `Repeats every ${reminder.repetition.days} days.`;
+                        } else if (reminder.repetition.type === 'incremental') {
+                            repetitionText = `Incremental, next in ${reminder.repetition.currentInterval} days.`;
+                        }
+
+                        const nextDueDate = new Date(reminder.due);
+                        const formattedDueDate = `${nextDueDate.toLocaleDateString()} at ${nextDueDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
+                        li.innerHTML = `
+                            <div>
+                                <p class="font-semibold text-gray-800 dark:text-white">${reminder.text}</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Next due: ${formattedDueDate}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-500">${repetitionText}</p>
+                            </div>
+                            <button data-id="${reminder.id}" class="delete-btn text-red-500 hover:text-red-700 font-semibold py-1 px-3 rounded-md focus:outline-none">Delete</button>
+                        `;
+                        reminderList.appendChild(li);
+                    });
+                }
+            }
+
+            // Function to save reminders to local storage
+            function saveReminders() {
+                localStorage.setItem('reminders', JSON.stringify(reminders));
+            }
+
+            // Handle form submission
+            reminderForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const reminderText = document.getElementById('reminderText').value;
+                const reminderTime = document.getElementById('reminderTime').value;
+                const repetitionType = document.querySelector('input[name="repetitionType"]:checked').value;
+
+                const [hours, minutes] = reminderTime.split(':');
+                const now = new Date();
+                let dueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+                // If the time is already past for today, set it for tomorrow
+                if (dueDate < now) {
+                    dueDate.setDate(dueDate.getDate() + 1);
+                }
+
+                const newReminder = {
+                    id: Date.now(),
+                    text: reminderText,
+                    due: dueDate.toISOString(),
+                    repetition: {
+                        type: repetitionType
+                    }
+                };
+
+                if (repetitionType === 'regular') {
+                    newReminder.repetition.days = parseInt(document.getElementById('repeatDays').value, 10);
+                } else if (repetitionType === 'incremental') {
+                    const startDays = parseInt(document.getElementById('incrementalStartDays').value, 10);
+                    newReminder.repetition.start = startDays;
+                    newReminder.repetition.currentInterval = startDays;
+                }
+
+                reminders.push(newReminder);
+                saveReminders();
+                renderReminders();
+                reminderForm.reset();
+                showToast('Reminder set successfully!');
+            });
+
+            // Handle deleting a reminder
+            reminderList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-btn')) {
+                    const reminderId = parseInt(e.target.dataset.id, 10);
+                    reminders = reminders.filter(r => r.id !== reminderId);
+                    saveReminders();
+                    renderReminders();
+                    showToast('Reminder deleted.');
+                }
+            });
+
+            // Function to show a notification
+            function showNotification(reminder) {
+                const notificationText = `It's time for: ${reminder.text}`;
+                if (Notification.permission === 'granted') {
+                    new Notification('Reminder!', { body: notificationText, icon: './favicon.ico' });
+                } else {
+                    // Fallback for when notifications are not granted
+                    alert(notificationText);
+                }
+            }
+            
+            // Main check loop
+            function checkReminders() {
+                const now = new Date();
+                let remindersChanged = false;
+
+                reminders.forEach(reminder => {
+                    const dueDate = new Date(reminder.due);
+
+                    if (now >= dueDate) {
+                        showNotification(reminder);
+                        remindersChanged = true;
+
+                        // Reschedule or remove the reminder
+                        if (reminder.repetition.type === 'none') {
+                            reminders = reminders.filter(r => r.id !== reminder.id);
+                        } else {
+                            let nextDueDate = new Date(reminder.due);
+                            if (reminder.repetition.type === 'regular') {
+                                nextDueDate.setDate(nextDueDate.getDate() + reminder.repetition.days);
+                                reminder.due = nextDueDate.toISOString();
+                            } else if (reminder.repetition.type === 'incremental') {
+                                nextDueDate.setDate(nextDueDate.getDate() + reminder.repetition.currentInterval);
+                                reminder.repetition.currentInterval += 1; // Increment for the next time
+                                reminder.due = nextDueDate.toISOString();
+                            }
+                        }
+                    }
+                });
+
+                if (remindersChanged) {
+                    saveReminders();
+                    renderReminders();
+                }
+            }
+
+            // Initial setup
+            function init() {
+                // Request notification permission on load
+                if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            showToast('Notifications enabled!');
+                        } else {
+                            showToast('Notifications disabled. Alerts will be used instead.');
+                        }
+                    });
+                }
+                
+                renderReminders();
+                // Check for due reminders every second
+                setInterval(checkReminders, 1000); 
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
